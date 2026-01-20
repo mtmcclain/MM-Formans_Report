@@ -1,6 +1,5 @@
-python==3.10
 streamlit
 openpyxl
 pandas
 python-dateutil
-pywin32  # only if you're on Windows and using the PDF part
+pywin32
