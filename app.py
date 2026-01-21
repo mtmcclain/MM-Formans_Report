@@ -163,12 +163,8 @@ with tab1:
         oth2 = st.checkbox("OTHER 2")
         oth2_type = st.text_input("Type", key="oth2_type") if oth2 else ""
 
-    # Generate button
     if st.button("Generate Foreman's Report", type="primary"):
         try:
-            # 1. Fill the Excel template (your existing filling code)
-# ─── Fix for CoInitialize error ───
-            
             wb = openpyxl.load_workbook("BlankForemanReport.xlsx")
             sheet = wb["FormansReport"]
 
@@ -177,13 +173,14 @@ with tab1:
             sheet["F5"] = job_name
             sheet["F6"] = job_number
             sheet["F7"] = description
-            # Fill the correct state cell based on selection
+
             if work_state == "Indiana":
-                sheet["J5"] = "X"
-                sheet["J4"] = ""  # clear Illinois if it was there
+                sheet["J5"] = "INDIANA"
+                sheet["J4"] = ""
             elif work_state == "Illinois":
-                sheet["J4"] = "X"
-                sheet["J5"] = ""  # clear Indiana
+                sheet["J4"] = "ILLINOIS"
+                sheet["J5"] = ""
+
             start_row = 10
             for idx, emp in enumerate(st.session_state.employees):
                 row = start_row + idx
@@ -223,58 +220,28 @@ with tab1:
             sheet["G44"] = oth1_type if oth1 else ""
             sheet["G45"] = oth2_type if oth2 else ""
 
+            output = BytesIO()
+            wb.save(output)
+            output.seek(0)
 
-            # 6. Offer PDF download (with your preferred filename style)
             job_name_clean = (job_name or "NoJobName").strip().replace(" ", "_").replace("/", "-")[:30]
             job_num_clean = (job_number or "NoJobNum").strip().replace(" ", "_").replace("/", "-")[:15]
-            filename = f"{job_name_clean}_{job_num_clean}_{report_date.strftime('%Y-%m-%d')}.pdf"
-            # Basic PDF using weasyprint (we'll make it look better next)
-            from weasyprint import HTML
-            html = f"""
-            <html>
-            <head><style>body {{ font-family: Arial; }}</style></head>
-            <body>
-            <h1>Foreman's Daily Report</h1>
-            <p><b>State:</b> {work_state}</p>
-            <p><b>Date:</b> {report_date.strftime('%m/%d/%Y')} ({day_name})</p>
-            <p><b>Job:</b> {job_name} - {job_number}</p>
-            <p><b>Description:</b> {description}</p>
-            <h2>Employees</h2>
-            <ul>
-            """
-            for emp in st.session_state.employees:
-                html += f"<li>{emp['name']} ({emp['craft']}): ST {emp['st']}, 1.5 {emp['one5']}, DT {emp['dt']}</li>"
-            html += f"""
-            </ul>
-            <h2>Notes:</h2>
-            <p>{work_notes.replace('\n', '<br>')}</p>
-            <h2>Equipment Used:</h2>
-            <p>Service Truck: {'X' if svc_truck else ''}</p>
-            <!-- add more equipment lines as needed -->
-            </body>
-            </html>
-            """
-            pdf_bytes = HTML(string=html).write_pdf()
-
-            filename = f"{job_name or 'NoJob'}_{job_number or 'NoNum'}_{report_date.strftime('%Y-%m-%d')}.pdf"
+            filename = f"{job_name_clean}_{job_num_clean}_{report_date.strftime('%Y-%m-%d')}.xlsx"
 
             st.download_button(
-                label="📥 Download PDF Report",
-                data=pdf_bytes,
+                label="📥 Download Filled Excel Report",
+                data=output,
                 file_name=filename,
-                mime="application/pdf",
-                key="pdf_dl"
-            )
-            st.download_button(
-                label="📥 Download PDF Report",
-                data=pdf_data,
-                file_name=filename,
-                mime="application/pdf",
-                key="pdf_download"
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key="excel_dl"
             )
 
-            st.success("PDF created successfully! Click above to download.")
+            st.success("Excel report ready! Download above. PDF coming in next step.")
 
+        except FileNotFoundError:
+            st.error("BlankForemanReport.xlsx not found in the folder!")
+        except Exception as e:
+            st.error(f"Error generating report: {str(e)}")  
 # ─── WEEKLY TIMESHEET ───────────────────────────────────────────────────────
 with tab2:
     st.header("Weekly Per Employee Timesheet")
@@ -282,4 +249,5 @@ with tab2:
 
 st.markdown("---")
 st.caption("Make sure EmployeeNames.xlsx and BlankForemanReport.xlsx are in the same folder.")
+
 
