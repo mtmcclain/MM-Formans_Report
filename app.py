@@ -1,7 +1,6 @@
 import streamlit as st
 import openpyxl
 import pandas as pd
-import win32com.client
 import tempfile
 import os
 from io import BytesIO
@@ -169,8 +168,6 @@ with tab1:
         try:
             # 1. Fill the Excel template (your existing filling code)
 # ─── Fix for CoInitialize error ───
-            import pythoncom
-            pythoncom.CoInitialize()
             
             wb = openpyxl.load_workbook("BlankForemanReport.xlsx")
             sheet = wb["FormansReport"]
@@ -226,34 +223,48 @@ with tab1:
             sheet["G44"] = oth1_type if oth1 else ""
             sheet["G45"] = oth2_type if oth2 else ""
 
-            # 2. Save filled Excel to a temporary file (needed for Excel COM)
-            with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as tmp_xlsx:
-                wb.save(tmp_xlsx.name)
-                xlsx_path = tmp_xlsx.name
-
-            pdf_path = xlsx_path.replace(".xlsx", ".pdf")
-
-            # 3. Use real Excel to convert to PDF
-            excel = win32com.client.Dispatch("Excel.Application")
-            excel.Visible = False  # Run in background
-            wb_excel = excel.Workbooks.Open(xlsx_path)
-            wb_excel.ExportAsFixedFormat(0, pdf_path)  # 0 = PDF
-            wb_excel.Close(False)
-            excel.Quit()
-
-            # 4. Read the PDF into memory for download
-            with open(pdf_path, "rb") as f:
-                pdf_data = f.read()
-
-            # 5. Clean up temporary files
-            os.unlink(xlsx_path)
-            os.unlink(pdf_path)
 
             # 6. Offer PDF download (with your preferred filename style)
             job_name_clean = (job_name or "NoJobName").strip().replace(" ", "_").replace("/", "-")[:30]
             job_num_clean = (job_number or "NoJobNum").strip().replace(" ", "_").replace("/", "-")[:15]
             filename = f"{job_name_clean}_{job_num_clean}_{report_date.strftime('%Y-%m-%d')}.pdf"
+            # Basic PDF using weasyprint (we'll make it look better next)
+            from weasyprint import HTML
+            html = f"""
+            <html>
+            <head><style>body {{ font-family: Arial; }}</style></head>
+            <body>
+            <h1>Foreman's Daily Report</h1>
+            <p><b>State:</b> {work_state}</p>
+            <p><b>Date:</b> {report_date.strftime('%m/%d/%Y')} ({day_name})</p>
+            <p><b>Job:</b> {job_name} - {job_number}</p>
+            <p><b>Description:</b> {description}</p>
+            <h2>Employees</h2>
+            <ul>
+            """
+            for emp in st.session_state.employees:
+                html += f"<li>{emp['name']} ({emp['craft']}): ST {emp['st']}, 1.5 {emp['one5']}, DT {emp['dt']}</li>"
+            html += f"""
+            </ul>
+            <h2>Notes:</h2>
+            <p>{work_notes.replace('\n', '<br>')}</p>
+            <h2>Equipment Used:</h2>
+            <p>Service Truck: {'X' if svc_truck else ''}</p>
+            <!-- add more equipment lines as needed -->
+            </body>
+            </html>
+            """
+            pdf_bytes = HTML(string=html).write_pdf()
 
+            filename = f"{job_name or 'NoJob'}_{job_number or 'NoNum'}_{report_date.strftime('%Y-%m-%d')}.pdf"
+
+            st.download_button(
+                label="📥 Download PDF Report",
+                data=pdf_bytes,
+                file_name=filename,
+                mime="application/pdf",
+                key="pdf_dl"
+            )
             st.download_button(
                 label="📥 Download PDF Report",
                 data=pdf_data,
@@ -264,10 +275,6 @@ with tab1:
 
             st.success("PDF created successfully! Click above to download.")
 
-        except FileNotFoundError:
-            st.error("BlankForemanReport.xlsx not found in the folder!")
-        except Exception as e:
-            st.error(f"Error during PDF creation: {str(e)}\n\nCommon fixes:\n- Make sure Microsoft Excel is installed\n- Close any open Excel windows\n- Run Command Prompt as Administrator and try again")
 # ─── WEEKLY TIMESHEET ───────────────────────────────────────────────────────
 with tab2:
     st.header("Weekly Per Employee Timesheet")
@@ -275,3 +282,4 @@ with tab2:
 
 st.markdown("---")
 st.caption("Make sure EmployeeNames.xlsx and BlankForemanReport.xlsx are in the same folder.")
+
