@@ -1,5 +1,2 @@
 streamlit
-openpyxl
-pandas
-libreoffice
-fonts-liberation
+pymupdf
