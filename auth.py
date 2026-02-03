@@ -6,9 +6,8 @@ import streamlit as st
 import yaml
 from pathlib import Path
 import hashlib
-import sqlite3
 import config
-from database import get_db_connection
+from database import get_db_connection, _exec, list_users, list_users
 
 def hash_password(password: str) -> str:
     """Hash a password using SHA256 (simple hashing for now)"""
@@ -42,42 +41,36 @@ def get_user_from_db(username: str) -> dict:
     """Get user from database"""
     conn = get_db_connection()
     cursor = conn.cursor()
-    
-    cursor.execute("""
+    _exec(cursor, """
         SELECT id, username, password_hash, full_name, role, email, is_active
         FROM users
-        WHERE username = ? AND is_active = 1
-    """, (username,))
-    
+        WHERE username = %s AND is_active = %s
+    """, (username, True))
     row = cursor.fetchone()
     conn.close()
-    
     if row:
         return dict(row)
     return None
 
-def create_user_in_db(username: str, password: str, full_name: str = None, 
+def create_user_in_db(username: str, password: str, full_name: str = None,
                       role: str = 'foreman', email: str = None) -> bool:
     """Create a new user in the database"""
     conn = get_db_connection()
     cursor = conn.cursor()
-    
     try:
         password_hash = hash_password(password)
-        cursor.execute("""
+        _exec(cursor, """
             INSERT INTO users (username, password_hash, full_name, role, email)
-            VALUES (?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s)
         """, (username, password_hash, full_name, role, email))
-        
         conn.commit()
         conn.close()
         return True
-    except sqlite3.IntegrityError:
-        conn.close()
-        return False  # Username already exists
     except Exception as e:
         conn.rollback()
         conn.close()
+        if "unique" in str(e).lower() or "duplicate" in str(e).lower() or "IntegrityError" in type(e).__name__:
+            return False  # Username already exists
         raise e
 
 def update_user_login_time(user_id: int):
@@ -85,11 +78,7 @@ def update_user_login_time(user_id: int):
     from datetime import datetime
     conn = get_db_connection()
     cursor = conn.cursor()
-    
-    cursor.execute("""
-        UPDATE users SET last_login = ? WHERE id = ?
-    """, (datetime.now(), user_id))
-    
+    _exec(cursor, "UPDATE users SET last_login = %s WHERE id = %s", (datetime.now(), user_id))
     conn.commit()
     conn.close()
 
@@ -101,9 +90,7 @@ def update_user_password(user_id: int, new_password: str) -> bool:
     conn = get_db_connection()
     cursor = conn.cursor()
     password_hash = hash_password(new_password)
-    cursor.execute("""
-        UPDATE users SET password_hash = ? WHERE id = ?
-    """, (password_hash, user_id))
+    _exec(cursor, "UPDATE users SET password_hash = %s WHERE id = %s", (password_hash, user_id))
     updated = cursor.rowcount > 0
     conn.commit()
     conn.close()

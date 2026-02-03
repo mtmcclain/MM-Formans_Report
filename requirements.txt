@@ -1,3 +1,4 @@
 streamlit
 pymupdf
 pyyaml
+psycopg2-binary
