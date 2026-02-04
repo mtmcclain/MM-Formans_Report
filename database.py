@@ -165,10 +165,11 @@ def save_report(
     
     try:
         equipment_json = json.dumps(equipment_used)
+        # Use booleans so PostgreSQL gets TRUE/FALSE (SQLite accepts bool as 1/0)
         params = (
             user_id, report_date, state, job_name, job_number,
             job_description, work_performed_notes, equipment_json,
-            1 if is_draft else 0, 0 if is_draft else 1, pdf_filename,
+            is_draft, not is_draft, pdf_filename,
             datetime.now()
         )
         if config.USE_POSTGRES:
@@ -272,9 +273,9 @@ def get_user_reports(user_id: int, include_drafts: bool = True) -> List[Dict]:
             SELECT id, report_date, state, job_name, job_number,
                    is_draft, is_submitted, created_at, updated_at
             FROM reports
-            WHERE user_id = %s AND is_draft = 0
+            WHERE user_id = %s AND is_draft = %s
             ORDER BY report_date DESC, created_at DESC
-        """, (user_id,))
+        """, (user_id, False))
     reports = [dict(row) for row in cursor.fetchall()]
     conn.close()
     return reports
@@ -290,9 +291,9 @@ def get_reports_by_week(job_number: str, week_start: date, week_end: date) -> Li
         WHERE r.job_number = %s
           AND r.report_date >= %s
           AND r.report_date <= %s
-          AND r.is_submitted = 1
+          AND r.is_submitted = %s
         ORDER BY r.report_date ASC
-    """, (job_number, week_start, week_end))
+    """, (job_number, week_start, week_end, True))
 
     reports = []
     for row in cursor.fetchall():
@@ -334,9 +335,9 @@ def get_user_reports_by_date_range(user_id: int, week_start: date, week_end: dat
         WHERE user_id = %s
           AND report_date >= %s
           AND report_date <= %s
-          AND is_submitted = 1
+          AND is_submitted = %s
         ORDER BY report_date ASC
-    """, (user_id, week_start, week_end))
+    """, (user_id, week_start, week_end, True))
 
     reports = []
     for row in cursor.fetchall():
@@ -379,11 +380,11 @@ def get_unique_employees_in_week(user_id: int, week_start: date, week_end: date)
         WHERE r.user_id = %s
           AND r.report_date >= %s
           AND r.report_date <= %s
-          AND r.is_submitted = 1
+          AND r.is_submitted = %s
           AND re.employee_name != ''
           AND re.employee_name IS NOT NULL
         ORDER BY re.employee_name
-    """, (user_id, week_start, week_end))
+    """, (user_id, week_start, week_end, True))
     employees = [row["employee_name"] for row in cursor.fetchall()]
     conn.close()
     return employees
@@ -408,9 +409,9 @@ def get_employee_timesheet_data(employee_name: str, week_start: date, week_end: 
         WHERE re.employee_name = %s
           AND r.report_date >= %s
           AND r.report_date <= %s
-          AND r.is_submitted = 1
+          AND r.is_submitted = %s
         ORDER BY r.report_date ASC, r.job_number ASC
-    """, (employee_name, week_start, week_end))
+    """, (employee_name, week_start, week_end, True))
     entries = [dict(row) for row in cursor.fetchall()]
     conn.close()
     return entries
@@ -433,7 +434,7 @@ def update_report_draft_status(report_id: int, user_id: int, is_draft: bool) -> 
         UPDATE reports
         SET is_draft = %s, is_submitted = %s, updated_at = %s
         WHERE id = %s AND user_id = %s
-    """, (1 if is_draft else 0, 0 if is_draft else 1, datetime.now(), report_id, user_id))
+    """, (is_draft, not is_draft, datetime.now(), report_id, user_id))
     updated = cursor.rowcount > 0
     conn.commit()
     conn.close()
@@ -461,7 +462,7 @@ def set_user_active(user_id: int, is_active: bool) -> bool:
     """Set user active status (True = can log in, False = deactivated)."""
     conn = get_db_connection()
     cursor = conn.cursor()
-    _exec(cursor, "UPDATE users SET is_active = %s WHERE id = %s", (1 if is_active else 0, user_id))
+    _exec(cursor, "UPDATE users SET is_active = %s WHERE id = %s", (is_active, user_id))
     updated = cursor.rowcount > 0
     conn.commit()
     conn.close()
