@@ -411,7 +411,7 @@ for idx, emp in enumerate(st.session_state.employees):
         emp["ot15"] = cols[3].number_input("Time 1.5", value=float(emp.get("ot15", 0.0)), min_value=0.0, step=0.5, key=f"ot15_{idx}")
         emp["otdt"] = cols[4].number_input("Double Time",  value=float(emp.get("otdt",  0.0)), min_value=0.0, step=0.5, key=f"otdt_{idx}")
 
-        if cols[5].button("🗑", key=f"del_{idx}"):
+        if cols[5].button("🗑", key=f"emp_del_{idx}"):
             st.session_state.employees.pop(idx)
             st.rerun()
 
@@ -534,7 +534,7 @@ with st.expander("💾 Save & Load Reports", expanded=True):
                     with row2:
                         load_col, del_col = st.columns([1, 1])
                         with load_col:
-                            if st.button("📂 Load", key=f"load_{r['id']}", use_container_width=True):
+                            if st.button("📂 Load", key=f"report_load_{r['id']}", use_container_width=True):
                                 draft = database.get_report(r["id"], user_id)
                                 if draft:
                                     if isinstance(draft["report_date"], str):
@@ -552,7 +552,7 @@ with st.expander("💾 Save & Load Reports", expanded=True):
                                     st.success("Report loaded.")
                                     st.rerun()
                         with del_col:
-                            if st.button("🗑 Delete", key=f"del_{r['id']}", use_container_width=True):
+                            if st.button("🗑 Delete", key=f"report_del_{r['id']}", use_container_width=True):
                                 if database.delete_report(r["id"], user_id):
                                     if st.session_state.current_draft_id == r["id"]:
                                         st.session_state.current_draft_id = None
