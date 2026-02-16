@@ -213,6 +213,64 @@ def save_report(
     finally:
         conn.close()
 
+
+def update_report(
+    report_id: int,
+    user_id: int,
+    report_date: date,
+    state: str,
+    job_name: str,
+    job_number: str,
+    job_description: str,
+    work_performed_notes: str,
+    equipment_used: dict,
+    employees: List[Dict],
+) -> Optional[int]:
+    """
+    Update an existing report (only if owned by user).
+    Updates the reports row and replaces report_employees.
+    Returns report_id on success, None if report not found or not owned by user.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        _exec(cursor, "SELECT id FROM reports WHERE id = %s AND user_id = %s", (report_id, user_id))
+        if cursor.fetchone() is None:
+            conn.close()
+            return None
+        equipment_json = json.dumps(equipment_used)
+        _exec(cursor, """
+            UPDATE reports SET
+                report_date = %s, state = %s, job_name = %s, job_number = %s,
+                job_description = %s, work_performed_notes = %s, equipment_used = %s,
+                is_draft = %s, is_submitted = %s, updated_at = %s
+            WHERE id = %s AND user_id = %s
+        """, (
+            report_date, state, job_name, job_number, job_description,
+            work_performed_notes, equipment_json, True, False, datetime.now(),
+            report_id, user_id
+        ))
+        _exec(cursor, "DELETE FROM report_employees WHERE report_id = %s", (report_id,))
+        for idx, emp in enumerate(employees):
+            _exec(cursor, """
+                INSERT INTO report_employees (
+                    report_id, employee_name, craft,
+                    straight_time, overtime_15, double_time, display_order
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """, (
+                report_id, emp.get("name", ""), emp.get("craft", "PF"),
+                float(emp.get("st", 0.0)), float(emp.get("ot15", 0.0)),
+                float(emp.get("otdt", 0.0)), idx
+            ))
+        conn.commit()
+        return report_id
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()
+
+
 def get_report(report_id: int, user_id: Optional[int] = None) -> Optional[Dict]:
     """Get a report by ID, optionally filtered by user_id"""
     conn = get_db_connection()
