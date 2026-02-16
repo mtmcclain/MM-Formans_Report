@@ -2,6 +2,8 @@
 
 This guide walks you through putting the Foreman's Report app on the internet so you can use it from your iPad (or any device) without running it on your PC.
 
+> **Recreating this app** (e.g. as a Capacitor iPad app)? See **[AGENT_REPLICATION_SPEC.md](AGENT_REPLICATION_SPEC.md)** for a full specification for agents and other implementations.
+
 ---
 
 ## Step 1: Get a GitHub account and put your code there

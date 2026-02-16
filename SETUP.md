@@ -1,6 +1,8 @@
 # Setup Instructions
 ## MM-Formans_Report Application
 
+> **Recreating this app** (e.g. as a Capacitor-wrapped web app for iPad)? See **[AGENT_REPLICATION_SPEC.md](AGENT_REPLICATION_SPEC.md)** for a full specification aimed at agents and other implementations.
+
 ---
 
 ## 🚀 Initial Setup
